@@ -9,7 +9,7 @@ spec:
     fsGroup: 9915       # Ensures proper permissions for mounted volumes
   containers:
   - name: dns-monitor
-    image: python:3.8
+    image: ghcr.io/wmgeolab/nicfi-download:latest
     command: ["python", "/sciclone/geograd/K8S_DNS_RES_ERROR/dns-monitor.py"]
     volumeMounts:
     - name: sciclone-volume
