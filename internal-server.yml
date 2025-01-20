@@ -5,6 +5,9 @@ metadata:
   labels:
     app: internal-dns-test
 spec:
+  securityContext:
+    runAsUser: 71032    # User ID for accessing NFS
+    runAsGroup: 9915    # Group ID for accessing NFS
   containers:
   - name: dns-test-server
     image: python:3.8-slim

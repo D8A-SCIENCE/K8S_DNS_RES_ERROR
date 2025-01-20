@@ -4,9 +4,8 @@ metadata:
   name: dns-monitor
 spec:
   securityContext:
-    runAsUser: 1000
-    runAsGroup: 3000
-    fsGroup: 3000
+    runAsUser: 71032    # User ID for accessing NFS
+    runAsGroup: 9915    # Group ID for accessing NFS
   containers:
   - name: dns-monitor
     image: python:3.8-slim
