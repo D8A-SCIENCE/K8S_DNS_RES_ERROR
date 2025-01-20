@@ -9,12 +9,8 @@ spec:
     fsGroup: 9915       # Ensures proper permissions for mounted volumes
   containers:
   - name: dns-monitor
-    image: python:3.8-slim
-    command: ["/bin/sh", "-c"]
-    args:
-      - |
-        pip install requests && \
-        python /sciclone/geograd/K8S_DNS_RES_ERROR/dns-monitor.py
+    image: python:3.8
+    command: ["python", "/sciclone/geograd/K8S_DNS_RES_ERROR/dns-monitor.py"]
     volumeMounts:
     - name: sciclone-volume
       mountPath: /sciclone/geograd/K8S_DNS_RES_ERROR/
