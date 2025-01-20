@@ -34,9 +34,9 @@ def log_message(message):
     with open(log_file, "a") as log:
         log.write(f"[{timestamp}] {message}\n")
 
-def check_connection(url):
+def check_connection(url, headers=None):
     try:
-        response = requests.get(url, timeout=5)
+        response = requests.get(url, headers=headers)
         response.raise_for_status()
         log_message(f"SUCCESS: Connected to {url}")
         return (url, True, None)  # URL, success flag, no error
@@ -45,13 +45,13 @@ def check_connection(url):
         log_message(error_message)
         return (url, False, str(e))  # URL, failure flag, error message
 
-def process_urls(urls, num_threads):
+def process_urls(urls, num_threads, headers=None):
     stats["total_attempts"] += len(urls)
     successful_attempts = 0
     errors = []
 
     with ThreadPoolExecutor(max_workers=num_threads) as executor:
-        future_to_url = {executor.submit(check_connection, url): url for url in urls}
+        future_to_url = {executor.submit(check_connection, url, headers): url for url in urls}
         for future in as_completed(future_to_url):
             url, success, error = future.result()
             if success:
@@ -62,24 +62,32 @@ def process_urls(urls, num_threads):
     stats["successful_attempts"] += successful_attempts
     stats["errors"].extend(errors)
 
+def generate_summary():
+    with open(summary_file, "w") as summary:
+        success_rate = stats["successful_attempts"] / stats["total_attempts"] * 100 if stats["total_attempts"] > 0 else 0
+        common_errors = {error: stats["errors"].count(error) for error in set(stats["errors"])}
+        summary.write(f"Total Attempts: {stats['total_attempts']}\n")
+        summary.write(f"Successful Attempts: {stats['successful_attempts']}\n")
+        summary.write(f"Success Rate: {success_rate:.2f}%\n")
+        summary.write(f"Common Errors:\n")
+        for error, count in common_errors.items():
+            summary.write(f"  {error}: {count} occurrences\n")
+    stats["errors"].clear()  # Clear errors after summarizing
+
+# Headers for the requests
+headers = {
+    "User-Agent": "DNS-Test-Script/1.0",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+}
+
 while True:
     # 10 internal DNS requests
-    process_urls([internal_url] * 100, INTERNAL_THREADS)
+    process_urls([internal_url] * 10, INTERNAL_THREADS, headers)
 
     # 5 external DNS requests
-    process_urls(external_urls, EXTERNAL_THREADS)
+    process_urls(external_urls, EXTERNAL_THREADS, headers)
 
-    # Generate summary once per hour
-    if datetime.now().minute == 0:
-        with open(summary_file, "w") as summary:
-            success_rate = stats["successful_attempts"] / stats["total_attempts"] * 100
-            common_errors = {error: stats["errors"].count(error) for error in set(stats["errors"])}
-            summary.write(f"Total Attempts: {stats['total_attempts']}\n")
-            summary.write(f"Successful Attempts: {stats['successful_attempts']}\n")
-            summary.write(f"Success Rate: {success_rate:.2f}%\n")
-            summary.write(f"Common Errors:\n")
-            for error, count in common_errors.items():
-                summary.write(f"  {error}: {count} occurrences\n")
-        stats["errors"].clear()  # Clear errors after summarizing
+    # Generate summary after each iteration
+    generate_summary()
 
     time.sleep(BACKOFF_SECONDS)
