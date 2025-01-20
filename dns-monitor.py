@@ -2,16 +2,17 @@ import os
 import time
 import requests
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
+import uuid
 
 # File paths
 log_dir = "/sciclone/geograd/K8S_DNS_RES_ERROR"
 log_file = os.path.join(log_dir, "log")
 summary_file = os.path.join(log_dir, "summary")
 
-# Server endpoints
-internal_url = "http://internal-dns-test/"
-external_urls = [
+# Server endpoints (base URLs)
+internal_url_base = "http://internal-dns-test/"
+external_url_bases = [
     "http://www.wm.edu",
     "https://wm.edu",
     "http://google.com",
@@ -32,11 +33,19 @@ iteration_count = 0
 os.makedirs(log_dir, exist_ok=True)
 
 def log_message(message):
+    """Log messages to the specified log file."""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     with open(log_file, "a") as log:
         log.write(f"[{timestamp}] {message}\n")
 
+def generate_dynamic_url(base_url):
+    """Generate a unique URL to trigger new DNS resolutions."""
+    unique_path = f"/path-{uuid.uuid4().hex}"
+    unique_query = f"ts={int(time.time() * 1000)}"
+    return f"{base_url}{unique_path}?{unique_query}"
+
 def check_connection(url, headers=None):
+    """Attempt a connection to the specified URL."""
     try:
         response = requests.get(url, headers=headers)
         response.raise_for_status()
@@ -47,14 +56,22 @@ def check_connection(url, headers=None):
         log_message(error_message)
         return (url, False, str(e))  # URL, failure flag, error message
 
-def process_urls(urls, num_threads, headers=None):
-    stats["total_attempts"] += len(urls)
+def process_urls(base_urls, num_threads, headers=None, delay_between=0.5):
+    """Process a list of URLs in parallel, staggering requests."""
+    stats["total_attempts"] += len(base_urls)
     successful_attempts = 0
     errors = []
 
+    # Generate dynamic URLs
+    urls = [generate_dynamic_url(base_url) for base_url in base_urls]
+
     with ThreadPoolExecutor(max_workers=num_threads) as executor:
-        future_to_url = {executor.submit(check_connection, url, headers): url for url in urls}
-        for future in as_completed(future_to_url):
+        futures = []
+        for url in urls:
+            futures.append(executor.submit(check_connection, url, headers))
+            time.sleep(delay_between)  # Space out requests
+
+        for future in futures:
             url, success, error = future.result()
             if success:
                 successful_attempts += 1
@@ -65,6 +82,7 @@ def process_urls(urls, num_threads, headers=None):
     stats["errors"].extend(errors)
 
 def generate_summary():
+    """Generate a summary of the test results and write to the summary file."""
     with open(summary_file, "w") as summary:
         success_rate = stats["successful_attempts"] / stats["total_attempts"] * 100 if stats["total_attempts"] > 0 else 0
         common_errors = {error: stats["errors"].count(error) for error in set(stats["errors"])}
@@ -87,12 +105,13 @@ headers = {
 while True:
     iteration_count += 1
 
-    # 10 internal DNS requests
-    process_urls([internal_url] * INTERNAL_ITERATIONS, CPU_COUNT, headers)
+    # Process 1000 internal DNS requests
+    process_urls([internal_url_base] * INTERNAL_ITERATIONS, CPU_COUNT, headers, delay_between=0.05)
 
-    # 5 external DNS requests
-    process_urls(external_urls, CPU_COUNT, headers)
+    # Process external DNS requests
+    process_urls(external_url_bases, CPU_COUNT, headers, delay_between=0.5)
 
+    # Generate summary every iteration
     generate_summary()
 
     time.sleep(BACKOFF_SECONDS)
