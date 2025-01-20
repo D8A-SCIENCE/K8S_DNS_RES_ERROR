@@ -13,10 +13,11 @@ summary_file = os.path.join(log_dir, "summary")
 internal_url = "http://internal-dns-test/"
 external_urls = [
     "http://www.wm.edu",
-    "http://wm.edu",
+    "https://wm.edu",
     "http://google.com",
     "http://bing.com",
-    "http://yahoo.com"
+    "http://yahoo.com",
+    "https://api.planet.com/basemaps/v1/mosaics"
 ]
 
 BACKOFF_SECONDS = 120  # in seconds
