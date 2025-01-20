@@ -2,6 +2,7 @@ import os
 import time
 import requests
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # File paths
 log_dir = "/sciclone/geograd/K8S_DNS_RES_ERROR"
@@ -10,7 +11,17 @@ summary_file = os.path.join(log_dir, "summary")
 
 # Server endpoints
 internal_url = "http://internal-dns-test/"
-external_url = "http://www.wm.edu"
+external_urls = [
+    "http://www.wm.edu",
+    "http://example.com",
+    "http://google.com",
+    "http://bing.com",
+    "http://yahoo.com"
+]
+
+BACKOFF_SECONDS = 180  # 3 minutes
+INTERNAL_THREADS = 10
+EXTERNAL_THREADS = 5
 
 # Statistics
 stats = {"total_attempts": 0, "successful_attempts": 0, "errors": []}
@@ -28,20 +39,35 @@ def check_connection(url):
         response = requests.get(url, timeout=5)
         response.raise_for_status()
         log_message(f"SUCCESS: Connected to {url}")
-        return True
+        return (url, True, None)  # URL, success flag, no error
     except Exception as e:
         error_message = f"ERROR: Failed to connect to {url} - {e}"
         log_message(error_message)
-        stats["errors"].append((url, str(e)))
-        return False
+        return (url, False, str(e))  # URL, failure flag, error message
+
+def process_urls(urls, num_threads):
+    stats["total_attempts"] += len(urls)
+    successful_attempts = 0
+    errors = []
+
+    with ThreadPoolExecutor(max_workers=num_threads) as executor:
+        future_to_url = {executor.submit(check_connection, url): url for url in urls}
+        for future in as_completed(future_to_url):
+            url, success, error = future.result()
+            if success:
+                successful_attempts += 1
+            else:
+                errors.append((url, error))
+
+    stats["successful_attempts"] += successful_attempts
+    stats["errors"].extend(errors)
 
 while True:
-    stats["total_attempts"] += 1
-    internal_success = check_connection(internal_url)
-    external_success = check_connection(external_url)
+    # 10 internal DNS requests
+    process_urls([internal_url] * 10, INTERNAL_THREADS)
 
-    if internal_success and external_success:
-        stats["successful_attempts"] += 1
+    # 5 external DNS requests
+    process_urls(external_urls, EXTERNAL_THREADS)
 
     # Generate summary once per hour
     if datetime.now().minute == 0:
@@ -56,4 +82,4 @@ while True:
                 summary.write(f"  {error}: {count} occurrences\n")
         stats["errors"].clear()  # Clear errors after summarizing
 
-    time.sleep(300)  # Wait 5 minutes before the next check
+    time.sleep(BACKOFF_SECONDS)
