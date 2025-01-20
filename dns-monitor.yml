@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dns-monitor
+spec:
+  securityContext:
+    runAsUser: 1000
+    runAsGroup: 3000
+    fsGroup: 3000
+  containers:
+  - name: dns-monitor
+    image: python:3.8-slim
+    command: ["python", "/sciclone/home/dsmillerrunfol/K8S_DNS_RES_ERROR/dns-monitor.py"]
+    volumeMounts:
+    - name: sciclone-volume
+      mountPath: /sciclone/home/dsmillerrunfol
+  volumes:
+  - name: sciclone-volume
+    nfs:
+      server: 128.239.59.144
+      path: /sciclone/home/dsmillerrunfol
+  restartPolicy: Always
