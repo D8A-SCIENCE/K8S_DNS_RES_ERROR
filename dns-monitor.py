@@ -3,16 +3,15 @@ import time
 import requests
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
-import uuid
 
 # File paths
 log_dir = "/sciclone/geograd/K8S_DNS_RES_ERROR"
 log_file = os.path.join(log_dir, "log")
 summary_file = os.path.join(log_dir, "summary")
 
-# Server endpoints (base URLs)
-internal_url_base = "http://internal-dns-test/"
-external_url_bases = [
+# Server endpoints
+internal_url = "http://internal-dns-test/"
+external_urls = [
     "http://www.wm.edu",
     "https://wm.edu",
     "http://google.com",
@@ -21,7 +20,7 @@ external_url_bases = [
     "https://www.planet.com"
 ]
 
-BACKOFF_SECONDS = 120  # in seconds
+BACKOFF_SECONDS = 120  # 2 minutes
 INTERNAL_ITERATIONS = 1000
 CPU_COUNT = 16
 
@@ -38,12 +37,6 @@ def log_message(message):
     with open(log_file, "a") as log:
         log.write(f"[{timestamp}] {message}\n")
 
-def generate_dynamic_url(base_url):
-    """Generate a unique URL to trigger new DNS resolutions."""
-    unique_path = f"/path-{uuid.uuid4().hex}"
-    unique_query = f"ts={int(time.time() * 1000)}"
-    return f"{base_url}{unique_path}?{unique_query}"
-
 def check_connection(url, headers=None):
     """Attempt a connection to the specified URL."""
     try:
@@ -56,14 +49,11 @@ def check_connection(url, headers=None):
         log_message(error_message)
         return (url, False, str(e))  # URL, failure flag, error message
 
-def process_urls(base_urls, num_threads, headers=None, delay_between=0.5):
+def process_urls(urls, num_threads, headers=None, delay_between=0.5):
     """Process a list of URLs in parallel, staggering requests."""
-    stats["total_attempts"] += len(base_urls)
+    stats["total_attempts"] += len(urls)
     successful_attempts = 0
     errors = []
-
-    # Generate dynamic URLs
-    urls = [generate_dynamic_url(base_url) for base_url in base_urls]
 
     with ThreadPoolExecutor(max_workers=num_threads) as executor:
         futures = []
@@ -105,11 +95,11 @@ headers = {
 while True:
     iteration_count += 1
 
-    # Process 1000 internal DNS requests
-    process_urls([internal_url_base] * INTERNAL_ITERATIONS, CPU_COUNT, headers, delay_between=0.05)
+    # Perform multiple internal DNS requests
+    process_urls([internal_url] * INTERNAL_ITERATIONS, CPU_COUNT, headers, delay_between=0.05)
 
-    # Process external DNS requests
-    process_urls(external_url_bases, CPU_COUNT, headers, delay_between=0.5)
+    # Perform multiple external DNS requests
+    process_urls(external_urls * (CPU_COUNT // len(external_urls)), CPU_COUNT, headers, delay_between=0.5)
 
     # Generate summary every iteration
     generate_summary()
