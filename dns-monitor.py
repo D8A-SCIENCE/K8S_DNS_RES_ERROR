@@ -20,9 +20,8 @@ external_urls = [
 ]
 
 BACKOFF_SECONDS = 120  # in seconds
-INTERNAL_ITERATIONS = 100
+INTERNAL_ITERATIONS = 1000
 CPU_COUNT = 16
-SUMMARY_INTERVAL = 20  # Generate summary every 20 iterations
 
 # Statistics
 stats = {"total_attempts": 0, "successful_attempts": 0, "errors": []}
@@ -93,8 +92,6 @@ while True:
     # 5 external DNS requests
     process_urls(external_urls, CPU_COUNT, headers)
 
-    # Generate summary every 20 iterations
-    if iteration_count % SUMMARY_INTERVAL == 0:
-        generate_summary()
+    generate_summary()
 
     time.sleep(BACKOFF_SECONDS)
