@@ -4,7 +4,7 @@ import requests
 from datetime import datetime
 
 # File paths
-log_dir = "/sciclone/home/dsmillerrunfol/K8S_DNS_RES_ERROR"
+log_dir = "/sciclone/geograd/K8S_DNS_RES_ERROR"
 log_file = os.path.join(log_dir, "log")
 summary_file = os.path.join(log_dir, "summary")
 
