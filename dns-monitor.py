@@ -13,18 +13,20 @@ summary_file = os.path.join(log_dir, "summary")
 internal_url = "http://internal-dns-test/"
 external_urls = [
     "http://www.wm.edu",
-    "http://example.com",
+    "http://wm.edu",
     "http://google.com",
     "http://bing.com",
     "http://yahoo.com"
 ]
 
-BACKOFF_SECONDS = 180  # 3 minutes
-INTERNAL_THREADS = 10
-EXTERNAL_THREADS = 5
+BACKOFF_SECONDS = 120  # in seconds
+INTERNAL_ITERATIONS = 100
+CPU_COUNT = 16
+SUMMARY_INTERVAL = 20  # Generate summary every 20 iterations
 
 # Statistics
 stats = {"total_attempts": 0, "successful_attempts": 0, "errors": []}
+iteration_count = 0
 
 # Ensure directories exist
 os.makedirs(log_dir, exist_ok=True)
@@ -66,6 +68,8 @@ def generate_summary():
     with open(summary_file, "w") as summary:
         success_rate = stats["successful_attempts"] / stats["total_attempts"] * 100 if stats["total_attempts"] > 0 else 0
         common_errors = {error: stats["errors"].count(error) for error in set(stats["errors"])}
+        most_recent_test = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        summary.write(f"Most Recent Tests: {most_recent_test}\n")
         summary.write(f"Total Attempts: {stats['total_attempts']}\n")
         summary.write(f"Successful Attempts: {stats['successful_attempts']}\n")
         summary.write(f"Success Rate: {success_rate:.2f}%\n")
@@ -81,13 +85,16 @@ headers = {
 }
 
 while True:
+    iteration_count += 1
+
     # 10 internal DNS requests
-    process_urls([internal_url] * 10, INTERNAL_THREADS, headers)
+    process_urls([internal_url] * INTERNAL_ITERATIONS, CPU_COUNT, headers)
 
     # 5 external DNS requests
-    process_urls(external_urls, EXTERNAL_THREADS, headers)
+    process_urls(external_urls, CPU_COUNT, headers)
 
-    # Generate summary after each iteration
-    generate_summary()
+    # Generate summary every 20 iterations
+    if iteration_count % SUMMARY_INTERVAL == 0:
+        generate_summary()
 
     time.sleep(BACKOFF_SECONDS)
