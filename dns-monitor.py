@@ -64,7 +64,7 @@ def process_urls(urls, num_threads):
 
 while True:
     # 10 internal DNS requests
-    process_urls([internal_url] * 10, INTERNAL_THREADS)
+    process_urls([internal_url] * 100, INTERNAL_THREADS)
 
     # 5 external DNS requests
     process_urls(external_urls, EXTERNAL_THREADS)
