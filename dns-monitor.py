@@ -17,7 +17,7 @@ external_urls = [
     "http://google.com",
     "http://bing.com",
     "http://yahoo.com",
-    "https://api.planet.com/basemaps/v1/mosaics"
+    "https://www.planet.com"
 ]
 
 BACKOFF_SECONDS = 120  # in seconds
