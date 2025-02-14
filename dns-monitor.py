@@ -31,9 +31,22 @@ external_urls = [
 BACKOFF_SECONDS = 120  # 2 minutes
 INTERNAL_ITERATIONS = 1000
 CPU_COUNT = 16
+external_urls = [
+    "http://www.wm.edu",
+    "https://wm.edu",
+    "http://google.com",
+    "http://bing.com",
+    "http://yahoo.com",
+    "https://www.planet.com"
+]
+
+BACKOFF_SECONDS = 120  # 2 minutes
+INTERNAL_ITERATIONS = 1000
+CPU_COUNT = 16
 
 # Statistics
 stats = {"total_attempts": 0, "successful_attempts": 0, "errors": []}
+iteration_count = 0
 iteration_count = 0
 
 # Ensure directories exist
@@ -52,6 +65,7 @@ def load_kubernetes_config():
         raise
 
 def log_message(message):
+    """Log messages to the specified log file."""
     """Log messages to the specified log file."""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     with open(log_file, "a") as log:
@@ -106,24 +120,4 @@ def generate_summary():
             summary.write(f"  {error}: {count} occurrences\n")
     stats["errors"].clear()  # Clear errors after summarizing
 
-# Headers for the requests
-headers = {
-    "User-Agent": "DNS-Test-Script/1.0",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-}
-
-
-
-while True:
-    iteration_count += 1
-
-    # Perform multiple internal DNS requests
-    process_urls([internal_url] * INTERNAL_ITERATIONS, CPU_COUNT, headers, delay_between=0.05)
-
-    # Perform multiple external DNS requests
-    process_urls(external_urls * (CPU_COUNT // len(external_urls)), CPU_COUNT, headers, delay_between=0.5)
-
-    # Generate summary every iteration
-    generate_summary()
-
-    time.sleep(BACKOFF_SECONDS)
+    time.sleep(300)  # Wait 5 minutes before the next check
