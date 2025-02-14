@@ -8,6 +8,15 @@ spec:
   securityContext:
     runAsUser: 71032  # Required for NFS compatibility
     runAsGroup: 9915  # Required for NFS group access
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: kubernetes.io/hostname
+            operator: In
+            values:
+            - d3i00.sciclone.wm.edu
   containers:
   - name: postgres
     image: postgis/postgis:14-3.3  # PostGIS-enabled PostgreSQL image

@@ -2,13 +2,22 @@ import os
 import time
 import requests
 import logging
+import argparse
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 import psycopg2
 from kubernetes import client, config
 
+# Argument Parsing
+parser = argparse.ArgumentParser(description="DNS Monitoring Script")
+parser.add_argument("d3i_flag", choices=["d3i", "not_d3i"], help="Specify either 'd3i' or 'not_d3i'")
+args = parser.parse_args()
+
 # File paths
-log_dir = "/sciclone/home/dsmillerrunfol/tmp"
+base_log_dir = "/sciclone/geograd/log"
+log_dir = os.path.join(base_log_dir, args.d3i_flag)
+os.makedirs(log_dir, exist_ok=True)
+
 log_file = os.path.join(log_dir, "log")
 summary_file = os.path.join(log_dir, "summary")
 
@@ -20,19 +29,16 @@ DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 DB_PORT = 5432
 
 # Server endpoints
-internal_url = "http://internal-dns-test/"
+internal_url = "http://internal-dns-test-web/"
 external_urls = ["http://www.wm.edu"]
 
 BACKOFF_SECONDS = 120  # 2 minutes
-INTERNAL_ITERATIONS = 1000
 CPU_COUNT = 16
 
 # Statistics
 stats = {"total_attempts": 0, "successful_attempts": 0, "errors": []}
 
-# Ensure directories exist
-os.makedirs(log_dir, exist_ok=True)
-
+# Logging Setup
 logging.basicConfig(filename=log_file, level=logging.INFO, format="%(asctime)s - %(message)s")
 
 def log_message(message):
@@ -54,21 +60,24 @@ def check_database_connection():
         )
         conn.close()
         log_message("SUCCESS: Connected to the database.")
-        return True
+        return "Connected"
     except Exception as e:
         log_message(f"ERROR: Database connection failed - {e}")
-        return False
+        return f"Failed ({e})"
 
 def load_kubernetes_config():
-    """Load Kubernetes configuration and check the number of running pods."""
+    """Load Kubernetes configuration and check the number of running pods in the 'dsmillerrunfol' namespace."""
     try:
         config_file = "/sciclone/geograd/geoBoundaries/.kube/config"
+        namespace = "dsmillerrunfol"  # Your personal namespace
+
         if os.path.exists(config_file):
             config.load_kube_config(config_file=config_file)
             v1 = client.CoreV1Api()
-            pods = v1.list_pod_for_all_namespaces(watch=False)
+            pods = v1.list_namespaced_pod(namespace=namespace, watch=False)
             pod_count = len(pods.items)
-            log_message(f"SUCCESS: Kubernetes cluster is accessible. Running pods: {pod_count}")
+
+            log_message(f"SUCCESS: Kubernetes cluster is accessible. Running pods in '{namespace}': {pod_count}")
             return pod_count
         else:
             raise FileNotFoundError(f"Kubeconfig file not found at: {config_file}")
@@ -76,10 +85,11 @@ def load_kubernetes_config():
         log_message(f"ERROR: Could not access Kubernetes cluster - {e}")
         return None
 
+
 def check_connection(url, headers=None):
     """Attempt a connection to the specified URL."""
     try:
-        response = requests.get(url, headers=headers)
+        response = requests.get(url, headers=headers, timeout=5)
         response.raise_for_status()
         log_message(f"SUCCESS: Connected to {url}")
         return url, True, None
@@ -110,7 +120,7 @@ def process_urls(urls, num_threads, headers=None, delay_between=0.5):
     stats["successful_attempts"] += successful_attempts
     stats["errors"].extend(errors)
 
-def generate_summary():
+def generate_summary(db_status, pod_count):
     """Generate a summary of the test results and write to the summary file."""
     with open(summary_file, "w") as summary:
         success_rate = (stats["successful_attempts"] / stats["total_attempts"] * 100) if stats["total_attempts"] > 0 else 0
@@ -125,19 +135,18 @@ def generate_summary():
         for error, count in common_errors.items():
             summary.write(f"  {error}: {count} occurrences\n")
 
-        # Append database and Kubernetes test results
-        db_status = "Connected" if check_database_connection() else "Failed"
-        pod_count = load_kubernetes_config()
-        k8s_status = f"Running pods: {pod_count}" if pod_count is not None else "Failed to retrieve pod count"
-
         summary.write(f"\nDatabase Connection Test: {db_status}\n")
-        summary.write(f"Kubernetes Cluster Test: {k8s_status}\n")
+        summary.write(f"Kubernetes Cluster Test: {'Running pods: ' + str(pod_count) if isinstance(pod_count, int) else pod_count}\n")
 
     stats["errors"].clear()  # Clear errors after summarizing
 
 # Run database and Kubernetes tests
-check_database_connection()
-load_kubernetes_config()
+db_status = check_database_connection()
+pod_count = load_kubernetes_config()
+
+# Run URL checks
+log_message("Starting URL connectivity tests...")
+process_urls([internal_url] + external_urls, num_threads=CPU_COUNT)
 
 # Generate summary
-generate_summary()
+generate_summary(db_status, pod_count)

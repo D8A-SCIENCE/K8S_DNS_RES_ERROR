@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dns-monitor-no-d3i
+spec:
+  securityContext:
+    runAsUser: 71032    # User ID for accessing NFS
+    runAsGroup: 9915    # Group ID for accessing NFS
+    fsGroup: 9915       # Ensures proper permissions for mounted volumes
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: kubernetes.io/hostname
+            operator: NotIn
+            values:
+            - d3i00.sciclone.wm.edu
+  containers:
+  - name: dns-monitor
+    image: ghcr.io/wmgeolab/gb-base:latest
+    command: ["python", "/sciclone/geograd/K8S_DNS_RES_ERROR/dns-monitor.py", "not_d3i"]
+    resources:
+      requests:
+        cpu: "12"        # Minimum of 12 cores
+      limits:
+        cpu: "12"        # Maximum of 12 cores
+    volumeMounts:
+    - name: sciclone-volume
+      mountPath: /sciclone/
+    securityContext:
+      allowPrivilegeEscalation: false
+  volumes:
+  - name: sciclone-volume
+    nfs:
+      server: 128.239.59.144
+      path: /sciclone/
+  restartPolicy: Never

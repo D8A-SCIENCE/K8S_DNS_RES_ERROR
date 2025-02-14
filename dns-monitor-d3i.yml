@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: dns-monitor
+  name: dns-monitor-d3i
 spec:
   securityContext:
     runAsUser: 71032    # User ID for accessing NFS
@@ -13,14 +13,13 @@ spec:
         nodeSelectorTerms:
         - matchExpressions:
           - key: kubernetes.io/hostname
-            operator: NotIn
+            operator: In
             values:
-            - dss
             - d3i00.sciclone.wm.edu
   containers:
   - name: dns-monitor
     image: ghcr.io/wmgeolab/gb-base:latest
-    command: ["python", "/sciclone/home/dsmillerrunfol/K8S_DNS_RES_ERROR/dns-monitor.py"]
+    command: ["python", "/sciclone/geograd/K8S_DNS_RES_ERROR/dns-monitor.py", "d3i"]
     resources:
       requests:
         cpu: "12"        # Minimum of 12 cores
@@ -36,4 +35,4 @@ spec:
     nfs:
       server: 128.239.59.144
       path: /sciclone/
-  restartPolicy: Always
+  restartPolicy: Never
