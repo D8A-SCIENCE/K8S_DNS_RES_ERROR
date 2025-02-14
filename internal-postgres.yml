@@ -8,7 +8,6 @@ spec:
   securityContext:
     runAsUser: 71032  # Required for NFS compatibility
     runAsGroup: 9915  # Required for NFS group access
-    fsGroup: 9915     # Ensures group ownership for the data directory
   containers:
   - name: postgres
     image: postgis/postgis:14-3.3  # PostGIS-enabled PostgreSQL image
@@ -37,7 +36,7 @@ spec:
   - name: postgres-data
     nfs:
       server: 128.239.59.144  # Replace with your NFS server IP
-      path: /sciclone/home/dsmillerrunfol/tmp
+      path: /sciclone/geograd/tmp
   # NFS path for PostgreSQL data storage
 ---
 apiVersion: v1
